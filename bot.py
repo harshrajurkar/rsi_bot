@@ -1,10 +1,14 @@
 import os
 import time
+import threading
 
+from flask import Flask
 import requests
 from dotenv import load_dotenv
 
 load_dotenv()
+
+app = Flask(__name__)
 
 API_KEY = os.getenv("TWELVE_DATA_API_KEY")
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -19,6 +23,20 @@ OVERSOLD = float(os.getenv("OVERSOLD", "30"))
 CHECK_SECONDS = int(os.getenv("CHECK_SECONDS", "60"))
 
 last_signal = None
+
+
+@app.route("/")
+def home():
+    return "Bot running"
+
+
+def run_web():
+    port = int(os.getenv("PORT", "10000"))
+    app.run(host="0.0.0.0", port=port, use_reloader=False)
+
+
+def start_web_server():
+    threading.Thread(target=run_web, daemon=True).start()
 
 
 def send_telegram(message: str):
@@ -134,4 +152,5 @@ def main():
 
 
 if __name__ == "__main__":
+    start_web_server()
     main()
