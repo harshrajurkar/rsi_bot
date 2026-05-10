@@ -44,6 +44,22 @@ jobs:
             --header "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
             --header "Accept: application/json"
 
+      - name: Notify Telegram after stop
+        if: steps.decide.outputs.action == 'suspend'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "Telegram secrets not configured. Skipping notification."
+            exit 0
+          fi
+
+          curl --fail --request POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --header "Content-Type: application/json" \
+            --data "{\"chat_id\":\"${TELEGRAM_CHAT_ID}\",\"text\":\"[STOPPED] RSI bot Render service suspended.\"}"
+
       - name: Start Render service for market open
         if: steps.decide.outputs.action == 'resume'
         run: |
@@ -51,6 +67,22 @@ jobs:
             "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }}/resume" \
             --header "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
             --header "Accept: application/json"
+
+      - name: Notify Telegram after start
+        if: steps.decide.outputs.action == 'resume'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "Telegram secrets not configured. Skipping notification."
+            exit 0
+          fi
+
+          curl --fail --request POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --header "Content-Type: application/json" \
+            --data "{\"chat_id\":\"${TELEGRAM_CHAT_ID}\",\"text\":\"[STARTING] RSI bot Render service resumed.\"}"
 
       - name: No action selected
         if: steps.decide.outputs.action == 'status'
