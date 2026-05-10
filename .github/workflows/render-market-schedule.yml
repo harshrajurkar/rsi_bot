@@ -1,0 +1,57 @@
+name: Render market schedule
+
+on:
+  schedule:
+    # Saturday 03:35 IST = Friday 22:05 UTC.
+    - cron: "5 22 * * 5"
+    # Monday 03:35 IST = Sunday 22:05 UTC.
+    - cron: "5 22 * * 0"
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Render action to run"
+        required: true
+        default: "status"
+        type: choice
+        options:
+          - status
+          - suspend
+          - resume
+
+jobs:
+  render-schedule:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Decide Render action
+        id: decide
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "action=${{ inputs.action }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "5 22 * * 5" ]; then
+            echo "action=suspend" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "5 22 * * 0" ]; then
+            echo "action=resume" >> "$GITHUB_OUTPUT"
+          else
+            echo "action=status" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Stop Render service for weekend close
+        if: steps.decide.outputs.action == 'suspend'
+        run: |
+          curl --fail --request POST \
+            "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }}/suspend" \
+            --header "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            --header "Accept: application/json"
+
+      - name: Start Render service for market open
+        if: steps.decide.outputs.action == 'resume'
+        run: |
+          curl --fail --request POST \
+            "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }}/resume" \
+            --header "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            --header "Accept: application/json"
+
+      - name: No action selected
+        if: steps.decide.outputs.action == 'status'
+        run: echo "Choose suspend or resume when running this workflow manually."
