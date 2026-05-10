@@ -1,6 +1,8 @@
 import os
 import time
 import threading
+from datetime import datetime, time as dt_time
+from zoneinfo import ZoneInfo
 
 from flask import Flask
 import requests
@@ -21,6 +23,9 @@ RSI_PERIOD = int(os.getenv("RSI_PERIOD", "14"))
 OVERBOUGHT = float(os.getenv("OVERBOUGHT", "70"))
 OVERSOLD = float(os.getenv("OVERSOLD", "30"))
 CHECK_SECONDS = int(os.getenv("CHECK_SECONDS", "60"))
+CLOSED_CHECK_SECONDS = int(os.getenv("CLOSED_CHECK_SECONDS", "3600"))
+MARKET_BOUNDARY_TIME = dt_time(3, 32)
+IST = ZoneInfo("Asia/Kolkata")
 
 last_signal = None
 
@@ -44,6 +49,21 @@ def send_telegram(message: str):
     payload = {"chat_id": CHAT_ID, "text": message}
     response = requests.post(url, json=payload, timeout=10)
     response.raise_for_status()
+
+
+def market_is_open():
+    now = datetime.now(IST)
+    weekday = now.weekday()
+    current_time = now.time()
+
+    if weekday == 5 and current_time >= MARKET_BOUNDARY_TIME:
+        return False
+    if weekday == 6:
+        return False
+    if weekday == 0 and current_time < MARKET_BOUNDARY_TIME:
+        return False
+
+    return True
 
 
 def fetch_closes():
@@ -142,13 +162,19 @@ def main():
 
     while True:
         try:
-            closes, times = fetch_closes()
-            rsi_values = calculate_rsi_series(closes)
-            check_signal(closes, times, rsi_values)
+            if market_is_open():
+                closes, times = fetch_closes()
+                rsi_values = calculate_rsi_series(closes)
+                check_signal(closes, times, rsi_values)
+                sleep_seconds = CHECK_SECONDS
+            else:
+                print("Market closed in IST schedule. Sleeping until next check...")
+                sleep_seconds = CLOSED_CHECK_SECONDS
         except Exception as e:
             print(f"Error: {e}")
+            sleep_seconds = CHECK_SECONDS
 
-        time.sleep(CHECK_SECONDS)
+        time.sleep(sleep_seconds)
 
 
 if __name__ == "__main__":
