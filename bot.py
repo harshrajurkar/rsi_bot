@@ -120,7 +120,7 @@ def check_signal(closes, times, rsi_values):
 
 
 def main():
-    send_telegram(f"[OK] RSI bot started for {SYMBOL} on {INTERVAL}")
+    send_telegram(f"[OK] RSI bot started foor {SYMBOL} on {INTERVAL}")
 
     while True:
         try:
