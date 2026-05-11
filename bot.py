@@ -27,7 +27,7 @@ CLOSED_CHECK_SECONDS = int(os.getenv("CLOSED_CHECK_SECONDS", "3600"))
 MARKET_BOUNDARY_TIME = dt_time(3, 32)
 IST = ZoneInfo("Asia/Kolkata")
 
-last_signal = None
+last_zone = None
 
 
 @app.route("/")
@@ -122,39 +122,38 @@ def calculate_rsi_series(closes):
 
 
 def check_signal(closes, times, rsi_values):
-    global last_signal
+    global last_zone
 
-    if len(rsi_values) < 2 or rsi_values[-1] is None or rsi_values[-2] is None:
+    if not rsi_values or rsi_values[-1] is None:
         return
 
-    previous_rsi = rsi_values[-2]
     current_rsi = rsi_values[-1]
     current_price = closes[-1]
     current_time = times[-1]
 
     print(f"{current_time} | {SYMBOL} | Price={current_price} | RSI={current_rsi:.2f}")
 
-    if previous_rsi <= OVERBOUGHT and current_rsi > OVERBOUGHT:
-        signal = f"SELL_{current_time}"
-        if last_signal != signal:
+    if current_rsi > OVERBOUGHT:
+        if last_zone != "overbought":
             send_telegram(
-                f"[SELL] RSI crossed above {OVERBOUGHT}\n"
+                f"[SELL] RSI above {OVERBOUGHT}\n"
                 f"{SYMBOL}\n"
                 f"Price: {current_price}\n"
                 f"RSI: {current_rsi:.2f}"
             )
-            last_signal = signal
+            last_zone = "overbought"
 
-    elif previous_rsi >= OVERSOLD and current_rsi < OVERSOLD:
-        signal = f"BUY_{current_time}"
-        if last_signal != signal:
+    elif current_rsi < OVERSOLD:
+        if last_zone != "oversold":
             send_telegram(
-                f"[BUY] RSI crossed below {OVERSOLD}\n"
+                f"[BUY] RSI below {OVERSOLD}\n"
                 f"{SYMBOL}\n"
                 f"Price: {current_price}\n"
                 f"RSI: {current_rsi:.2f}"
             )
-            last_signal = signal
+            last_zone = "oversold"
+    else:
+        last_zone = None
 
 
 def main():
