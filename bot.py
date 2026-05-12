@@ -287,21 +287,21 @@ def check_signal(closes, times, rsi_values):
 
     if current_rsi >= OVERBOUGHT and last_alerted_candle["overbought"] != current_time:
         send_telegram(
-            f"[SELL] RSI at/above {OVERBOUGHT}\n"
-            f"{SYMBOL}\n"
-            f"Time: {current_time}\n"
+            f"SELL signal\n"
+            f"{SYMBOL} RSI crossed above {OVERBOUGHT}\n"
             f"Price: {current_price}\n"
-            f"RSI: {current_rsi:.2f}"
+            f"RSI: {current_rsi:.2f}\n"
+            f"Candle: {current_time}"
         )
         last_alerted_candle["overbought"] = current_time
 
     if current_rsi <= OVERSOLD and last_alerted_candle["oversold"] != current_time:
         send_telegram(
-            f"[BUY] RSI at/below {OVERSOLD}\n"
-            f"{SYMBOL}\n"
-            f"Time: {current_time}\n"
+            f"BUY signal\n"
+            f"{SYMBOL} RSI crossed below {OVERSOLD}\n"
             f"Price: {current_price}\n"
-            f"RSI: {current_rsi:.2f}"
+            f"RSI: {current_rsi:.2f}\n"
+            f"Candle: {current_time}"
         )
         last_alerted_candle["oversold"] = current_time
 
