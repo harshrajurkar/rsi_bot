@@ -27,7 +27,11 @@ CLOSED_CHECK_SECONDS = int(os.getenv("CLOSED_CHECK_SECONDS", "3600"))
 MARKET_BOUNDARY_TIME = dt_time(3, 32)
 IST = ZoneInfo("Asia/Kolkata")
 
-last_zone = None
+last_alerted_candle = {
+    "overbought": None,
+    "oversold": None,
+}
+last_error_notice = None
 
 
 @app.route("/")
@@ -49,6 +53,19 @@ def send_telegram(message: str):
     payload = {"chat_id": CHAT_ID, "text": message}
     response = requests.post(url, json=payload, timeout=10)
     response.raise_for_status()
+
+
+def notify_error(message: str):
+    global last_error_notice
+
+    if message == last_error_notice:
+        return
+
+    try:
+        send_telegram(f"[ERROR] RSI bot\n{message}")
+        last_error_notice = message
+    except Exception as telegram_error:
+        print(f"Telegram error notice failed: {telegram_error}")
 
 
 def market_is_open():
@@ -122,8 +139,6 @@ def calculate_rsi_series(closes):
 
 
 def check_signal(closes, times, rsi_values):
-    global last_zone
-
     if not rsi_values or rsi_values[-1] is None:
         return
 
@@ -133,31 +148,35 @@ def check_signal(closes, times, rsi_values):
 
     print(f"{current_time} | {SYMBOL} | Price={current_price} | RSI={current_rsi:.2f}")
 
-    if current_rsi > OVERBOUGHT:
-        if last_zone != "overbought":
-            send_telegram(
-                f"[SELL] RSI above {OVERBOUGHT}\n"
-                f"{SYMBOL}\n"
-                f"Price: {current_price}\n"
-                f"RSI: {current_rsi:.2f}"
-            )
-            last_zone = "overbought"
+    if current_rsi >= OVERBOUGHT and last_alerted_candle["overbought"] != current_time:
+        send_telegram(
+            f"[SELL] RSI at/above {OVERBOUGHT}\n"
+            f"{SYMBOL}\n"
+            f"Time: {current_time}\n"
+            f"Price: {current_price}\n"
+            f"RSI: {current_rsi:.2f}"
+        )
+        last_alerted_candle["overbought"] = current_time
 
-    elif current_rsi < OVERSOLD:
-        if last_zone != "oversold":
-            send_telegram(
-                f"[BUY] RSI below {OVERSOLD}\n"
-                f"{SYMBOL}\n"
-                f"Price: {current_price}\n"
-                f"RSI: {current_rsi:.2f}"
-            )
-            last_zone = "oversold"
-    else:
-        last_zone = None
+    if current_rsi <= OVERSOLD and last_alerted_candle["oversold"] != current_time:
+        send_telegram(
+            f"[BUY] RSI at/below {OVERSOLD}\n"
+            f"{SYMBOL}\n"
+            f"Time: {current_time}\n"
+            f"Price: {current_price}\n"
+            f"RSI: {current_rsi:.2f}"
+        )
+        last_alerted_candle["oversold"] = current_time
 
 
 def main():
-    send_telegram(f"[OK] RSI bot started for {SYMBOL} on {INTERVAL}")
+    send_telegram(
+        f"[OK] RSI bot started\n"
+        f"{SYMBOL} on {INTERVAL}\n"
+        f"SELL RSI >= {OVERBOUGHT}\n"
+        f"BUY RSI <= {OVERSOLD}\n"
+        f"Check every {CHECK_SECONDS} seconds"
+    )
 
     while True:
         try:
@@ -171,6 +190,7 @@ def main():
                 sleep_seconds = CLOSED_CHECK_SECONDS
         except Exception as e:
             print(f"Error: {e}")
+            notify_error(str(e))
             sleep_seconds = CHECK_SECONDS
 
         time.sleep(sleep_seconds)
