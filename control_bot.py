@@ -81,6 +81,7 @@ def get_service_status():
     data = render_request("GET", f"/services/{RENDER_SERVICE_ID}")
     service = data.get("service", data)
     name = service.get("name", "unknown")
+    service_id = service.get("id", RENDER_SERVICE_ID)
     service_type = service.get("type", "unknown")
     suspended = service.get("suspended")
     auto_deploy = service.get("autoDeploy")
@@ -96,10 +97,27 @@ def get_service_status():
     return (
         f"[STATUS]\n"
         f"Service: {name}\n"
+        f"Service ID: {service_id}\n"
         f"Type: {service_type}\n"
         f"State: {state}\n"
         f"Branch: {branch}\n"
         f"Auto deploy: {auto_deploy}"
+    )
+
+
+def deploy_summary(action, data):
+    deploy = data.get("deploy", data)
+    deploy_id = deploy.get("id", "unknown")
+    status = deploy.get("status", "queued")
+    commit = deploy.get("commit", {}) or {}
+    commit_id = commit.get("id") or deploy.get("commitId") or "latest"
+
+    return (
+        f"[OK] {action} requested.\n"
+        f"Target service ID: {RENDER_SERVICE_ID}\n"
+        f"Deploy ID: {deploy_id}\n"
+        f"Deploy status: {status}\n"
+        f"Commit: {commit_id}"
     )
 
 
@@ -122,35 +140,35 @@ def handle_command(text):
 
     if command == "/stop":
         render_request("POST", f"/services/{RENDER_SERVICE_ID}/suspend")
-        return "[OK] RSI bot suspend requested."
+        return f"[OK] Suspend requested.\nTarget service ID: {RENDER_SERVICE_ID}"
 
     if command in ("/resume", "/startbot"):
         render_request("POST", f"/services/{RENDER_SERVICE_ID}/resume")
-        return "[OK] RSI bot resume requested."
+        return f"[OK] Resume requested.\nTarget service ID: {RENDER_SERVICE_ID}"
 
     if command == "/deploy":
-        render_request(
+        data = render_request(
             "POST",
             f"/services/{RENDER_SERVICE_ID}/deploys",
             {"clearCache": "do_not_clear"},
         )
-        return "[OK] Deploy latest commit requested."
+        return deploy_summary("Deploy latest commit", data)
 
     if command == "/clearcache":
-        render_request(
+        data = render_request(
             "POST",
             f"/services/{RENDER_SERVICE_ID}/deploys",
             {"clearCache": "clear"},
         )
-        return "[OK] Clear cache deploy requested."
+        return deploy_summary("Clear cache deploy", data)
 
     if command == "/restart":
-        render_request(
+        data = render_request(
             "POST",
             f"/services/{RENDER_SERVICE_ID}/deploys",
             {"clearCache": "do_not_clear"},
         )
-        return "[OK] Restart/deploy requested."
+        return deploy_summary("Restart/deploy", data)
 
     return "Unknown command. Send /help."
 
